@@ -332,7 +332,15 @@ def parse_args(extra_args_provider=None, defaults={},
     else:
         args.lr_auto_warmup_steps = None
 
-    if args.greedily_aggregate_multitask or args.aggregated_samples_per_sequence:
+    if args.int8_quantization_warmup_steps and len(args.int8_quantization_warmup_steps) > 0:
+        assert args.apply_int8_quantization
+        assert len(args.int8_quantization_warmup_steps) == 2, 'len(int8-quantization-warmup-steps) != 2'
+        args.int8_quantization_warmup_steps[0] = int(args.int8_quantization_warmup_steps[0])
+        args.int8_quantization_warmup_steps[1] = int(args.int8_quantization_warmup_steps[1])
+    else:
+        args.int8_quantization_warmup_steps = None
+
+    if args.greedily_aggregate_multitask or args.aggregated_samples_per_sequence > 1:
         assert args.finetune or args.micro_batch_size == 1
 
     if args.load_deepspeed_model_only:
@@ -465,6 +473,8 @@ def _add_logging_args(parser):
 
     group.add_argument('--log-params-norm', action='store_true',
                        help='If set, calculate and log parameters norm.')
+    group.add_argument('--log-params-inf-norm-by-layer', action='store_true',
+                       help='If set, calculate and log parameters inf norm by layer.')
     group.add_argument('--log-gradient-norm-by-layer', action='store_true',
                        help='If set, calculate and log grad norm by layer.')
     group.add_argument('--log-model-update', action='store_true',
@@ -628,6 +638,11 @@ def _add_training_args(parser):
     group.add_argument('--apply-rotary-positional-embedding-kernel', action='store_true',
                        help='Use custom cuda kernel for rotary positional embedding.')
     group.add_argument('--use-hinge-cross-entropy-loss', action='store_true')
+    group.add_argument('--apply-int8-quantization', action='store_true', default=None)
+    group.add_argument('--activation-in-fp16', action='store_true', default=None)
+    group.add_argument("--weight-quantization-bit-width", type=int, default=8)
+    group.add_argument('--int8-quantization-warmup-steps', nargs='*', default=None,
+                       help='--int8-quantization-warmup-steps <x1> <x2>')
 
     return parser
 
@@ -1152,6 +1167,7 @@ def _add_glm_args(parser):
     group = parser.add_argument_group("GLM", "GLM configurations")
     group.add_argument('--glm', action='store_true', help="whether use the BlockLM pre-training")
     group.add_argument("--gpt-prob", type=float, default=0.0)
+    group.add_argument("--sent-prob", type=float, default=0.0)
     # group.add_argument("--short-seq-prob", type=float, default=0.02)
     group.add_argument("--single-span-prob", type=float, default=0.02)
     # group.add_argument("--mask-ratio", type=float, default=0.15)

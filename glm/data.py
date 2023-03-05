@@ -72,13 +72,16 @@ def build_train_valid_test_datasets(
     tokenizer = get_tokenizer()
 
     collator = GLMPreprocessor(
+        tokenizer=tokenizer,
         eod_id=tokenizer.get_special_token("eod"),
         mask_id=tokenizer.get_special_token("MASK"),
+        smask_id=tokenizer.get_special_token("sMASK"),
         gmask_id=tokenizer.get_special_token("gMASK"),
         sop_id=tokenizer.get_special_token("sop"),
         eop_id=tokenizer.get_special_token("eop"),
         max_seq_length=seq_length,
         aggregated_samples_per_sequence=aggregated_samples_per_sequence,
+        sent_prob=args.sent_prob,
         gpt_prob=args.gpt_prob,
         short_seq_prob=args.short_seq_prob,
         single_span_prob=args.single_span_prob,
@@ -96,11 +99,14 @@ def build_train_valid_test_datasets(
     )
 
     if data_prefix is not None:
-        dataset = BinaryDataset(
-            f"{data_prefix[0]}.bin",
-            lambda tokens, index: get_input(*collator.get_input_data(np.array(tokens), index)),  # np.memmap -> np.array
-            length_per_sample=length_per_sample,
-        )
+        text_datasets = []
+        for prefix in data_prefix:
+            text_datasets.append(BinaryDataset(
+                f"{prefix}.bin",
+                lambda tokens, index: get_input(*collator.get_input_data(np.array(tokens), index)),  # np.memmap -> np.array
+                length_per_sample=length_per_sample,
+            ))
+        dataset = ConcatDataset(text_datasets)
         train_dataset, valid_dataset, test_dataset = split_ds(
             dataset, [float(s) for s in splits_string.split(",")], block_size=10000
         )
